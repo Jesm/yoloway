@@ -11,17 +11,18 @@ int STREET_COLOR = 96;
 int DIVISOR_HEIGHT = 40;
 int CAR_WIDTH = 68;
 int CAR_HEIGHT = 34;
-int CAR_COLORS[][] = {
-  {66, 133, 244},
-  {234, 67, 53},
-  {52, 168, 83}
-}; 
+int CAR_COLORS[][] = {{66, 133, 244}, {234, 67, 53}, {52, 168, 83}}; 
 int CAR_VELOCITY_BASE = 160;
 int CAR_VELOCITY_INCREASE = 30;
-int AGENT_WIDTH = 34;
-int AGENT_HEIGHT = 34;
-int AGENT_COLOR = 240;
+int PLAYER_WIDTH = 34;
+int PLAYER_HEIGHT = 34;
+int PLAYER_COLOR = 240;
 int PLAYER_VELOCITY = 120;
+String NOT_FOCUSED_TEXT = "Clique na tela para mover o personagem";
+int TEXT_COLOR = 40;
+int PLAYER_READY = 1;
+int PLAYER_RAN_OVER = 2;
+int PLAYER_SUCCESS = 3;
 
 App app;
 
@@ -74,8 +75,10 @@ class App{
     currentStage.updatedControl(control);
   }
   
-  protected void loadNextStage(){
-    level++;
+  void stageFinished(boolean success){
+    if(success)
+      level++;
+
     loadStage();
   }
 }
@@ -86,24 +89,28 @@ class Stage{
   protected int totalHeight;
   protected int lastTimestamp;
   protected Player player;
+  protected int endGameInstant;
 
   Stage(int level){
     objects = new ArrayList<Object>();
     lastTimestamp = millis();
-    player = new Player();
+    endGameInstant = 0;
     
-    setupFreeway(level, player);
+    setup(level);
   }
   
-  void setupFreeway(int level, Player player){
+  void setup(int level){
     totalHeight = 0;
     int baseVelocity = CAR_VELOCITY_BASE + level * CAR_VELOCITY_INCREASE; 
 
     for(int x = 2; x-- > 0;){
       boolean isTop = x == 1;
       
-      if(isTop)
-        addFreewayObject(new Sidewalk(true));
+      if(isTop){
+        Sidewalk topSidewalk = new Sidewalk(true);
+        addFreewayObject(topSidewalk);
+        player = new Player(topSidewalk);
+      }
       
       lanes = new Lane[LANE_NUMBER * 2];
       for(int y = LANE_NUMBER; y-- > 0;){
@@ -114,7 +121,7 @@ class Stage{
       }
 
       if(isTop)
-        addFreewayObject(new Divisor());
+        addFreewayObject(new Divisor(level));
       else{
         Sidewalk bottomSidewalk = new Sidewalk(false);
         addFreewayObject(bottomSidewalk);
@@ -122,7 +129,7 @@ class Stage{
         float posX = (bottomSidewalk.getWidth() - player.getWidth()) / 2 + bottomSidewalk.getX();
         float posY = (bottomSidewalk.getHeight() - player.getHeight()) / 2 + bottomSidewalk.getY();
         player.setPosition(posX, posY);
-        
+
         addObject(player);
       }
     }
@@ -143,22 +150,59 @@ class Stage{
     int timestamp = millis();
     int elapsed = timestamp - lastTimestamp;
     lastTimestamp = timestamp;
+    
+    if(player.getStatus() != PLAYER_READY){
+      if(endGameInstant == 0)
+        endGameInstant = millis();
+      else if(millis() - endGameInstant > 2000)
+        app.stageFinished(player.getStatus() == PLAYER_SUCCESS);
+
+      return;
+    }
 
     for(Object object : objects)
       moveObject(object, elapsed);
-    
-    for(int size = objects.size(); size-- > 0;){
-      if(objects.get(size).shouldRemove())
-        objects.remove(size);
-    }
+      
+    verifyCollisions();
+    verifyObjectsToRemove();
   }
   
   void moveObject(Object object, int elapsedTime){
     float increase = object.getVelocity() / 1000 * elapsedTime;
     float direction = object.getDirection();
+    
+    float x = object.getX() + cos(direction) * increase;
+    float y = object.getY() + sin(direction) * increase;
+    
+    if(!object.canEscapeScreen()){
+      x = min(max(x, 0), ENVIRONMENT_WIDTH - object.getWidth());
+      y = min(max(y, 0), totalHeight - object.getHeight());
+    }
 
-    object.setX(object.getX() + cos(direction) * increase);
-    object.setY(object.getY() + sin(direction) * increase);
+    object.setPosition(x, y);
+  }
+  
+  protected void verifyCollisions(){
+    for(int x = 0, len = objects.size(); x < len; x++){
+      Object current = objects.get(x);
+      if(!current.verifiesCollision())
+        continue;
+
+      for(int y = x + 1; y < len; y++){
+        Object comparison = objects.get(y);
+        if(comparison.verifiesCollision() && current.isCollidingWith(comparison)){
+          current.collidedWidth(comparison);
+          comparison.collidedWidth(current);
+        }
+      }
+    }
+  }
+  
+  protected void verifyObjectsToRemove(){
+    for(int size = objects.size(); size-- > 0;){
+      if(objects.get(size).shouldRemove())
+        objects.remove(size);
+    }
   }
 
   void draw(){
@@ -176,20 +220,24 @@ class Stage{
   }
   
   void updatedControl(KeyboardControl control){
-    float radians = HALF_PI;
-    if(control.left())
-      radians += HALF_PI;
-    if(control.right())
-      radians -= HALF_PI;
-  
-    float halfDiff = (radians - HALF_PI) / 2;
-    if(control.down())
-      radians -= halfDiff;
-    if(control.up())
-      radians += radians == HALF_PI ? PI : halfDiff;
+    float halfPi = 90;
+    float pi = halfPi * 2;
+    float twoPi = pi * 2;
 
-    player.setDirection(radians);
-    player.setVelocity(radians % PI == HALF_PI && control.down() == control.up() ? 0 : PLAYER_VELOCITY);
+    float degree = halfPi;
+    if(control.left())
+      degree += halfPi;
+    if(control.right())
+      degree -= halfPi;
+  
+    float halfDiff = (degree - halfPi) / 2;
+    if(control.down())
+      degree -= halfDiff;
+    if(control.up())
+      degree += degree == halfPi ? pi : halfDiff;
+
+    player.setDirection(degree / twoPi * TWO_PI);
+    player.setVelocity(degree % pi == halfPi && control.down() == control.up() ? 0 : PLAYER_VELOCITY);
   }
 }
 
@@ -205,21 +253,33 @@ abstract class Object{
     return 0;
   }
 
-  void setPosition(float x, float y){
-    setX(x);
-    setY(y);
-  }
-
-  void setX(float posX){
+  void setPosition(float posX, float posY){
     x = posX;
-  }
-  
-  void setY(float posY){
     y = posY;
   }
-  
+
   void setStage(Stage s){
     stage = s;
+  }
+  
+  boolean isInsideOf(Object object){
+    float objectX = object.getX();
+    float objectY = object.getY();
+
+    return x >= objectX
+      && x + getWidth() < objectX + object.getWidth()
+      && y >= objectY
+      && y + getHeight() < objectY + object.getHeight();
+  }
+
+  boolean isCollidingWith(Object object){
+    float objectX = object.getX();
+    float objectY = object.getY();
+
+    return x < objectX + object.getWidth()
+      && x + getWidth() >= objectX
+      && y < objectY + object.getHeight()
+      && y + getHeight() >= objectY;
   }
 
   void setDirection(float d){
@@ -246,8 +306,22 @@ abstract class Object{
     return velocity;
   }
   
+  // OVERWRITE
+  
   boolean shouldRemove(){
     return false;
+  }
+  
+  boolean canEscapeScreen(){
+    return true;
+  }
+  
+  boolean verifiesCollision(){
+    return false;
+  }
+  
+  void collidedWidth(Object object){
+    return;
   }
 }
 
@@ -321,6 +395,12 @@ class Lane extends Object{
 }
 
 class Divisor extends Object{
+  protected int level;
+
+  Divisor(int l){
+    level = l;
+  }
+
   int getWidth(){
     return ENVIRONMENT_WIDTH;
   }
@@ -332,6 +412,17 @@ class Divisor extends Object{
   void draw(){
     fill(SIDEWALK_COLOR);
     rect(0, 0, getWidth(), getHeight());
+    
+    fill(TEXT_COLOR);
+    textSize(20);
+    String str = "Level " + level;
+    float width = textWidth(str);
+    text(str, (getWidth() - width) / 2, getHeight() / 2 + 7);
+    
+    if(!focused){
+      textSize(12);
+      text(NOT_FOCUSED_TEXT, getWidth() - 240, 12, getWidth() - 10, getHeight());
+    }
   }
 }
 
@@ -363,6 +454,10 @@ class Car extends Object{
     return remove;
   }
   
+  boolean verifiesCollision(){
+    return true;
+  }
+  
   void draw(){
     fill(bgColor[0], bgColor[1], bgColor[2]);
     rect(0, 0, getWidth(), getHeight());
@@ -370,16 +465,55 @@ class Car extends Object{
 }
 
 class Player extends Object{
+  protected Sidewalk destination;
+  protected int status;
+  
+  Player(Sidewalk d){
+    destination = d;
+    status = PLAYER_READY;
+  }
+  
+  int getStatus(){
+    return status;
+  }
+
   int getWidth(){
-    return AGENT_WIDTH;
+    return PLAYER_WIDTH;
   }
 
   int getHeight(){
-    return AGENT_HEIGHT;
+    return PLAYER_HEIGHT;
+  }  
+  
+  boolean canEscapeScreen(){
+    return false;
+  } 
+  
+  boolean verifiesCollision(){
+    return true;
+  }
+  
+  void collidedWidth(Object object){
+    if(status == PLAYER_READY)
+      status = PLAYER_RAN_OVER;
+  }
+  
+  boolean shouldRemove(){
+    if(status == PLAYER_READY && isInsideOf(destination))
+      status = PLAYER_SUCCESS;
+
+    return false;
+  }
+  
+  int getZIndex(){
+    return 1;
   }
   
   void draw(){
-    fill(AGENT_COLOR);
+    if(status == PLAYER_RAN_OVER && millis() % 200 < 100)
+      return;
+
+    fill(PLAYER_COLOR);
     stroke(48);
     rect(0, 0, getWidth(), getHeight());
   }
