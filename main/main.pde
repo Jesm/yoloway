@@ -8,7 +8,7 @@ int LANE_DIVISION_HEIGHT = 5;
 int LANE_DIVISION_SEGMENT_WIDTH = 40;
 int LANE_DIVISION_SEGMENT_COLOR[] = {251, 188, 5};
 int STREET_COLOR = 96;
-int DIVISOR_HEIGHT = 30;
+int DIVISOR_HEIGHT = 40;
 int CAR_WIDTH = 68;
 int CAR_HEIGHT = 34;
 int CAR_COLORS[][] = {
@@ -16,27 +16,42 @@ int CAR_COLORS[][] = {
   {234, 67, 53},
   {52, 168, 83}
 }; 
-int BASE_VELOCITY = 200;
-int VELOCITY_INCREASE = 30;
+int CAR_VELOCITY_BASE = 160;
+int CAR_VELOCITY_INCREASE = 30;
+int AGENT_WIDTH = 34;
+int AGENT_HEIGHT = 34;
+int AGENT_COLOR = 240;
+int PLAYER_VELOCITY = 120;
 
 App app;
 
 void setup(){
-  size(640, 550);
+  size(640, 558);
 
   app = new App();  
 }
 
 void draw(){
+  clear();
   app.draw();
+}
+
+void keyPressed(){
+  app.setKeyPressStatus(keyCode, true);
+}
+
+void keyReleased(){
+  app.setKeyPressStatus(keyCode, false);
 }
 
 class App{
   protected int level;
   protected Stage currentStage;
-  
+  protected KeyboardControl control;
+
   App(){
     level = 1;
+    control = new KeyboardControl();
 
     setup();
   }
@@ -54,7 +69,12 @@ class App{
     currentStage.draw();
   }
   
-  void loadNextStage(){
+  void setKeyPressStatus(int keyCode, boolean pressed){
+    control.setKeyStatus(keyCode, pressed);
+    currentStage.updatedControl(control);
+  }
+  
+  protected void loadNextStage(){
     level++;
     loadStage();
   }
@@ -65,23 +85,25 @@ class Stage{
   protected Object lanes[];
   protected int totalHeight;
   protected int lastTimestamp;
+  protected Player player;
 
   Stage(int level){
     objects = new ArrayList<Object>();
     lastTimestamp = millis();
-
-    setupFreeway(level);
+    player = new Player();
+    
+    setupFreeway(level, player);
   }
   
-  void setupFreeway(int level){
+  void setupFreeway(int level, Player player){
     totalHeight = 0;
-    int baseVelocity = BASE_VELOCITY + level * VELOCITY_INCREASE; 
+    int baseVelocity = CAR_VELOCITY_BASE + level * CAR_VELOCITY_INCREASE; 
 
     for(int x = 2; x-- > 0;){
       boolean isTop = x == 1;
       
       if(isTop)
-        addFreewayObject(new Sidewalk(isTop));
+        addFreewayObject(new Sidewalk(true));
       
       lanes = new Lane[LANE_NUMBER * 2];
       for(int y = LANE_NUMBER; y-- > 0;){
@@ -93,8 +115,16 @@ class Stage{
 
       if(isTop)
         addFreewayObject(new Divisor());
-      else
-        addFreewayObject(new Sidewalk(isTop));
+      else{
+        Sidewalk bottomSidewalk = new Sidewalk(false);
+        addFreewayObject(bottomSidewalk);
+        
+        float posX = (bottomSidewalk.getWidth() - player.getWidth()) / 2 + bottomSidewalk.getX();
+        float posY = (bottomSidewalk.getHeight() - player.getHeight()) / 2 + bottomSidewalk.getY();
+        player.setPosition(posX, posY);
+        
+        addObject(player);
+      }
     }
   }
   
@@ -139,10 +169,27 @@ class Stage{
 
       translate(object.getX(), object.getY());
       object.draw();
-      
+
       popStyle();
       popMatrix();
     }
+  }
+  
+  void updatedControl(KeyboardControl control){
+    float radians = HALF_PI;
+    if(control.left())
+      radians += HALF_PI;
+    if(control.right())
+      radians -= HALF_PI;
+  
+    float halfDiff = (radians - HALF_PI) / 2;
+    if(control.down())
+      radians -= halfDiff;
+    if(control.up())
+      radians += radians == HALF_PI ? PI : halfDiff;
+
+    player.setDirection(radians);
+    player.setVelocity(radians % PI == HALF_PI && control.down() == control.up() ? 0 : PLAYER_VELOCITY);
   }
 }
 
@@ -157,12 +204,12 @@ abstract class Object{
   int getZIndex(){
     return 0;
   }
-  
+
   void setPosition(float x, float y){
     setX(x);
     setY(y);
   }
-  
+
   void setX(float posX){
     x = posX;
   }
@@ -174,7 +221,15 @@ abstract class Object{
   void setStage(Stage s){
     stage = s;
   }
-  
+
+  void setDirection(float d){
+    direction = d;
+  }
+
+  void setVelocity(float v){
+    velocity = v;
+  }
+
   float getX(){
     return x;
   }
@@ -244,7 +299,7 @@ class Lane extends Object{
   }
   
   void isEmpty(){
-    float velocity = random(carVelocity * .3, carVelocity);
+    float velocity = random(carVelocity * .75, carVelocity * 1.25);
     Car car = new Car(this, carDirection, velocity);
     float x = carDirection == 0 ? 0 - car.getWidth() : getWidth();
     float y = (LANE_HEIGHT - car.getHeight()) / 2 + getY();
@@ -311,5 +366,61 @@ class Car extends Object{
   void draw(){
     fill(bgColor[0], bgColor[1], bgColor[2]);
     rect(0, 0, getWidth(), getHeight());
+  }
+}
+
+class Player extends Object{
+  int getWidth(){
+    return AGENT_WIDTH;
+  }
+
+  int getHeight(){
+    return AGENT_HEIGHT;
+  }
+  
+  void draw(){
+    fill(AGENT_COLOR);
+    stroke(48);
+    rect(0, 0, getWidth(), getHeight());
+  }
+}
+
+class KeyboardControl{
+  boolean arrows[];
+  
+  KeyboardControl(){
+    arrows = new boolean[4];
+    for(int len = arrows.length; len-- > 0;)
+      arrows[len] = false;
+  }
+  
+  void setKeyStatus(int keyCode, boolean status){
+    if(keyCode >= 37 && keyCode <= 41)
+      arrows[keyCode - 37] = status;
+  }
+  
+  boolean left(){
+    return arrows[0];
+  }
+  
+  boolean up(){
+    return arrows[1];
+  }
+  
+  boolean right(){
+    return arrows[2];
+  }
+  
+  boolean down(){
+    return arrows[3];
+  }
+  
+  boolean any(){
+    for(int len = arrows.length; len-- > 0;){
+      if(arrows[len])
+        return true;
+    }
+    
+    return false;
   }
 }
