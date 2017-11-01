@@ -11,7 +11,11 @@ int STREET_COLOR = 96;
 int DIVISOR_HEIGHT = 40;
 int CAR_WIDTH = 68;
 int CAR_HEIGHT = 34;
-int CAR_COLORS[][] = {{66, 133, 244}, {234, 67, 53}, {52, 168, 83}}; 
+int CAR_COLORS[][] = {{66, 133, 244}, {234, 67, 53}, {52, 168, 83}};
+int CAR_HEADLIGHT_RADIUS = 8;
+int CAR_HEADLIGHT_COLOR[] = {267, 204, 21};
+int CAR_WINDOW_COLOR = 48;
+int CAR_WINDOW_HEIGHT = 14;
 int CAR_VELOCITY_BASE = 160;
 int CAR_VELOCITY_INCREASE = 30;
 int PLAYER_WIDTH = 34;
@@ -461,6 +465,21 @@ class Car extends Object{
   void draw(){
     fill(bgColor[0], bgColor[1], bgColor[2]);
     rect(0, 0, getWidth(), getHeight());
+
+    translate(getWidth() / 2, getHeight() / 2);
+    rotate(direction);
+
+    float x = getWidth() / 2;
+    float y = getHeight() / 2;
+
+    int windowStart = 2;
+    fill(CAR_WINDOW_COLOR);
+    quad(windowStart, -y / 2, windowStart + CAR_WINDOW_HEIGHT, (y / 4) - y, windowStart + CAR_WINDOW_HEIGHT, y - (y / 4), windowStart, y / 2);
+
+    float dist_headlight = y / 2;
+    fill(CAR_HEADLIGHT_COLOR[0], CAR_HEADLIGHT_COLOR[1], CAR_HEADLIGHT_COLOR[2]);
+    arc(x, dist_headlight, CAR_HEADLIGHT_RADIUS, CAR_HEADLIGHT_RADIUS, HALF_PI, PI + HALF_PI);
+    arc(x, -dist_headlight, CAR_HEADLIGHT_RADIUS, CAR_HEADLIGHT_RADIUS, HALF_PI, PI + HALF_PI);
   }
 }
 
