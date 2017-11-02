@@ -15,12 +15,12 @@ int CAR_COLORS[][] = {{66, 133, 244}, {234, 67, 53}, {52, 168, 83}};
 int CAR_HEADLIGHT_RADIUS = 8;
 int CAR_HEADLIGHT_COLOR[] = {267, 204, 21};
 int CAR_WINDOW_COLOR = 48;
-int CAR_WINDOW_HEIGHT = 14;
+int CAR_WINDOW_HEIGHT = 12;
 int CAR_VELOCITY_BASE = 160;
 int CAR_VELOCITY_INCREASE = 30;
 int PLAYER_WIDTH = 34;
 int PLAYER_HEIGHT = 34;
-int PLAYER_COLOR = 240;
+int PLAYER_COLOR[] = {252, 195, 20};
 int PLAYER_VELOCITY = 120;
 String NOT_FOCUSED_TEXT = "Clique na tela para mover o personagem";
 int TEXT_COLOR = 40;
@@ -475,6 +475,8 @@ class Car extends Object{
     int windowStart = 2;
     fill(CAR_WINDOW_COLOR);
     quad(windowStart, -y / 2, windowStart + CAR_WINDOW_HEIGHT, (y / 4) - y, windowStart + CAR_WINDOW_HEIGHT, y - (y / 4), windowStart, y / 2);
+    windowStart *= 5;
+    quad(-windowStart, -y / 2, -windowStart - CAR_WINDOW_HEIGHT, (y / 4) - y, -windowStart - CAR_WINDOW_HEIGHT, y - (y / 4), -windowStart, y / 2);
 
     float dist_headlight = y / 2;
     fill(CAR_HEADLIGHT_COLOR[0], CAR_HEADLIGHT_COLOR[1], CAR_HEADLIGHT_COLOR[2]);
@@ -531,10 +533,45 @@ class Player extends Object{
   void draw(){
     if(status == PLAYER_RAN_OVER && millis() % 200 < 100)
       return;
-
-    fill(PLAYER_COLOR);
+    
+    fill(PLAYER_COLOR[0], PLAYER_COLOR[1], PLAYER_COLOR[2]);
     stroke(48);
     rect(0, 0, getWidth(), getHeight());
+    
+    float diff = getWidth() / 4;
+    float eyeCenterX = diff;
+    float eyeCenterY = diff * 2;
+    float mouthCenterX = getWidth() / 2;
+    float mouthCenterY = getHeight() * .75;
+    float mouthWidth = 16;
+    
+    if(status == PLAYER_RAN_OVER){
+      char eyeChar = 'X';
+      float textWidth = textWidth(eyeChar);
+
+      textSize(13);
+      textAlign(CENTER);
+      fill(48);
+      text(eyeChar, eyeCenterX, eyeCenterY);
+      text(eyeChar, getWidth() - eyeCenterX, eyeCenterY);
+      
+      arc(mouthCenterX, mouthCenterY + mouthWidth / 4, mouthWidth - 2, mouthWidth + 3, PI, TWO_PI);
+    }
+    else{
+      fill(255);
+      arc(eyeCenterX, eyeCenterY, 10, 20, PI, TWO_PI, CHORD);
+      arc(getWidth() - eyeCenterX, eyeCenterY, 10, 20, PI, TWO_PI, CHORD);
+      fill(0);
+      arc(eyeCenterX, eyeCenterY - 4, 4, 4, 0, TWO_PI);
+      arc(getWidth() - eyeCenterX, eyeCenterY - 4, 4, 4, 0, TWO_PI);
+      
+      if(status == PLAYER_SUCCESS){
+        arc(mouthCenterX, mouthCenterY - mouthWidth / 4, mouthWidth, mouthWidth, 0, PI);
+      }
+      else{
+        line(mouthCenterX - mouthWidth / 2, mouthCenterY, mouthCenterX + mouthWidth / 2, mouthCenterY);
+      }
+    }
   }
 }
 
